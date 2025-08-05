@@ -1,2 +1,2 @@
-add_executable(Client Client.cpp)
-target_link_libraries(Client PRIVATE Common Ws2_32)
+add_executable(Client Client.cpp Renderer.cpp)
+target_link_libraries(Client PRIVATE Common)
