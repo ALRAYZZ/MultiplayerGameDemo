@@ -23,25 +23,6 @@ struct Player
 	int32_t health;
 };
 
-// This allows us to call packet.deserialize(buffer) and it will automatically call the correct deserialize function based on the packet type
-struct Packet
-{
-	// Union allows us to save memory by using the same space for different types of data
-	// Packet struct will only be one type at a time either message, input, state or connect...
-	PacketType type;
-	union 
-	{
-		char message[256];
-		InputPacket input;
-		InputAckPacket inputAck;
-		StatePacket state;
-		uint32_t playerId;
-	};
-
-	void serialize(char* buffer) const;
-	void deserialize(const char* buffer);
-};
-
 struct InputAckPacket
 {
 	uint32_t playerId;
@@ -72,6 +53,25 @@ struct StatePacket
 	uint32_t playerCount;
 	Player players[MAX_PLAYERS];
 	uint32_t timestamp;
+
+	void serialize(char* buffer) const;
+	void deserialize(const char* buffer);
+};
+
+// This allows us to call packet.deserialize(buffer) and it will automatically call the correct deserialize function based on the packet type
+struct Packet
+{
+	// Union allows us to save memory by using the same space for different types of data
+	// Packet struct will only be one type at a time either message, input, state or connect...
+	PacketType type;
+	union 
+	{
+		char message[256];
+		InputPacket input;
+		StatePacket state;
+		uint32_t playerId;
+		InputAckPacket inputAck;
+	};
 
 	void serialize(char* buffer) const;
 	void deserialize(const char* buffer);

@@ -51,6 +51,7 @@ void GameState::queueInput(const InputPacket& input)
 		playerInput.input = input;
 		playerInput.sequence = input.sequence;
 		inputBuffers[input.playerId].push(playerInput);
+		std::cout << "[SERVER] Player " << input.playerId << " sent input seq " << input.sequence << " (last processed = " << lastProcessedSequences[input.playerId] << ")" << std::endl;
 	}
 }
 
@@ -69,9 +70,10 @@ void GameState::processInput()
 			}
 
 			const InputPacket& input = playerInput.input;
-			float moveSpeed = 0.1f; // Define a movement speed
-			if (input.moveUp) player.y += moveSpeed;
-			if (input.moveDown) player.y -= moveSpeed;
+			std::cout << "[SERVER] Processing input seq=" << input.sequence	<< " for player " << player.id << std::endl;
+			float moveSpeed = 1.0f; // Define a movement speed
+			if (input.moveUp) player.y -= moveSpeed;
+			if (input.moveDown) player.y += moveSpeed;
 			if (input.moveLeft) player.x -= moveSpeed;
 			if (input.moveRight) player.x += moveSpeed;
 

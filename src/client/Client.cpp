@@ -67,6 +67,8 @@ void Client::handleInput()
 	{
 		input.timestamp = static_cast<uint32_t>(time(nullptr));
 		input.sequence = inputSequence++;
+		std::cout << "[CLIENT] Using inputSequence = " << input.sequence << std::endl;
+		std::cout << "[CLIENT] Raw inputSequence = " << inputSequence << std::endl;
 		unacknowledgedInputs.push(input);
 		Packet inputPacket;
 		inputPacket.type = PacketType::INPUT;
@@ -74,6 +76,7 @@ void Client::handleInput()
 		char buffer[MAX_PACKET_SIZE];
 		inputPacket.serialize(buffer);
 		network.sendPacket(socket, serverAddr, buffer, MAX_PACKET_SIZE);
+		std::cout << "Sent input sequence " << input.sequence << std::endl;
 	}
 }
 
@@ -95,6 +98,7 @@ void Client::resendUnacknowledgedInputs()
 			char buffer[MAX_PACKET_SIZE];
 			inputPacket.serialize(buffer);
 			network.sendPacket(socket, serverAddr, buffer, MAX_PACKET_SIZE);
+			std::cout << "Resent input sequence " << input.sequence << std::endl;
 		}
 	}
 }
@@ -123,6 +127,7 @@ void Client::handlePacket(const Packet& packet)
 			if (input.sequence > packet.inputAck.sequence)
 			{
 				unacknowledgedInputs.push(input);
+				std::cout << "[CLIENT] Got ACK for seq " << packet.inputAck.sequence << std::endl;
 			}
 		}
 	}

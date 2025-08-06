@@ -30,6 +30,8 @@ void InputPacket::serialize(char* buffer) const
     memcpy(buffer + offset, &moveRight, sizeof(moveRight));
     offset += sizeof(moveRight);
     memcpy(buffer + offset, &timestamp, sizeof(timestamp));
+	offset += sizeof(timestamp);
+	memcpy(buffer + offset, &sequence, sizeof(sequence));
 }
 
 void InputPacket::deserialize(const char* buffer)
@@ -46,6 +48,8 @@ void InputPacket::deserialize(const char* buffer)
     memcpy(&moveRight, buffer + offset, sizeof(moveRight));
     offset += sizeof(moveRight);
     memcpy(&timestamp, buffer + offset, sizeof(timestamp));
+	offset += sizeof(timestamp);
+	memcpy(&sequence, buffer + offset, sizeof(sequence));
 }
 
 void StatePacket::serialize(char* buffer) const
