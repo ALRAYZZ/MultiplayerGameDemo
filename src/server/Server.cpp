@@ -102,6 +102,7 @@ void Server::tick()
 	}
 
 	tickCount++;
+	std::cout << "Tick " << tickCount << ": State timestamp " << state.timestamp << std::endl;
 }
 
 void Server::run()

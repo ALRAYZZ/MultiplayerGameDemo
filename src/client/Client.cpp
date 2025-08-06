@@ -2,7 +2,7 @@
 #include <conio.h>
 #include <iostream>
 
-Client::Client(const std::string& serverIp, uint16_t serverPort) : playerId(0), connected(false), socket(INVALID_SOCKET), inputSequence(0)
+Client::Client(const std::string& serverIp, uint16_t serverPort) : playerId(0), connected(false), socket(INVALID_SOCKET), inputSequence(0), lastStateTimestamp(0)
 {
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(serverPort);
@@ -111,9 +111,11 @@ void Client::handlePacket(const Packet& packet)
 		connected = true;
 		std::cout << "Connected as Player " << playerId << std::endl;
 	}
-	else if (packet.type == PacketType::STATE && connected)
+	else if (packet.type == PacketType::STATE && connected && packet.isNewerThan(lastStateTimestamp))
 	{
+		lastStateTimestamp = packet.state.timestamp;
 		renderer.render(packet.state);
+		std::cout << "Applied state with timestamp " << packet.state.timestamp << std::endl;
 	}
 	else if (packet.type == PacketType::INPUT_ACK && connected)
 	{

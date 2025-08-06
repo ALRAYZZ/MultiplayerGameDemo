@@ -6,6 +6,8 @@ void InputAckPacket::serialize(char* buffer) const
     memcpy(buffer + offset, &playerId, sizeof(playerId));
 	offset += sizeof(playerId);
     memcpy(buffer + offset, &sequence, sizeof(sequence));
+	offset += sizeof(sequence);
+	memcpy(buffer + offset, &timestamp, sizeof(timestamp));
 }
 
 void InputAckPacket::deserialize(const char* buffer)
@@ -14,6 +16,8 @@ void InputAckPacket::deserialize(const char* buffer)
     memcpy(&playerId, buffer + offset, sizeof(playerId));
     offset += sizeof(playerId);
     memcpy(&sequence, buffer + offset, sizeof(sequence));
+	offset += sizeof(sequence);
+	memcpy(&timestamp, buffer + offset, sizeof(timestamp));
 }
 
 void InputPacket::serialize(char* buffer) const

@@ -23,11 +23,12 @@ private:
 	{
 		InputPacket input;
 		uint32_t sequence;
+		uint32_t timestamp;
 	};
 
 	std::vector<Player> players;
 	std::map<std::string, sockaddr_in> clients;
-	std::map<uint32_t, std::queue<PlayerInput>> inputBuffers; // Per player input buffer with all inputs received
+	std::map<uint32_t, std::vector<PlayerInput>> inputBuffers; // Per player input buffer with all inputs received
 	std::map<uint32_t, uint32_t> lastProcessedSequences; // Track last processed sequence number
 	StatePacket state;
 	uint32_t nextPlayerId;

@@ -1,6 +1,7 @@
 #include "GameState.h"
 #include <WS2tcpip.h>
 #include <iostream>
+#include <algorithm>
 
 GameState::GameState() : nextPlayerId(1)
 {
@@ -28,7 +29,7 @@ bool GameState::addPlayer(const sockaddr_in& clientAddr, uint32_t& playerId)
 	newPlayer.health = 100;
 	players.push_back(newPlayer); // Add the player to the players vector
 	clients[clientKey] = clientAddr; // Store the client address in the map that stores clients and their addresses
-	inputBuffers[newPlayer.id] = std::queue<PlayerInput>(); // Initialize input buffer for the player
+	inputBuffers[newPlayer.id] = std::vector<PlayerInput>(); // Initialize input buffer for the player
 	lastProcessedSequences[newPlayer.id] = 0; // Initialize last processed sequence for the player
 
 	
@@ -50,7 +51,8 @@ void GameState::queueInput(const InputPacket& input)
 		PlayerInput playerInput;
 		playerInput.input = input;
 		playerInput.sequence = input.sequence;
-		inputBuffers[input.playerId].push(playerInput);
+		playerInput.timestamp = input.timestamp;
+		inputBuffers[input.playerId].push_back(playerInput);
 		std::cout << "[SERVER] Player " << input.playerId << " sent input seq " << input.sequence << " (last processed = " << lastProcessedSequences[input.playerId] << ")" << std::endl;
 	}
 }
@@ -60,12 +62,19 @@ void GameState::processInput()
 	for (auto& player : players)
 	{
 		auto& buffer = inputBuffers[player.id];
+
+		// Sort inputs by timestamp to ensure chronological processing
+		std::sort(buffer.begin(), buffer.end(), [](const PlayerInput& a, const PlayerInput& b)
+			{
+				return a.timestamp < b.timestamp;
+			});
+
 		while (!buffer.empty())
 		{
 			const PlayerInput& playerInput = buffer.front();
 			if (playerInput.sequence <= lastProcessedSequences[player.id])
 			{
-				buffer.pop(); // Discard outdate inputs
+				buffer.erase(buffer.begin()); // Discard outdate inputs
 				continue;
 			}
 
@@ -78,7 +87,7 @@ void GameState::processInput()
 			if (input.moveRight) player.x += moveSpeed;
 
 			lastProcessedSequences[player.id] = playerInput.sequence; // Update last processed sequence
-			buffer.pop(); // Remove the processed input
+			buffer.erase(buffer.begin()); // Remove the processed input
 		}
 	}
 

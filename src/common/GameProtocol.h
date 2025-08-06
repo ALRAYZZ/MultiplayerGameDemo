@@ -27,6 +27,7 @@ struct InputAckPacket
 {
 	uint32_t playerId;
 	uint32_t sequence; // Tracking the sequence number of the input being acknowledged
+	uint32_t timestamp;
 
 	void serialize(char* buffer) const;
 	void deserialize(const char* buffer);
@@ -75,6 +76,21 @@ struct Packet
 
 	void serialize(char* buffer) const;
 	void deserialize(const char* buffer);
+	bool isNewerThan(uint32_t otherTimestamp) const
+	{
+		if (type == PacketType::INPUT)
+		{
+			return input.timestamp > otherTimestamp;
+		}
+		else if (type == PacketType::STATE)
+		{
+			return state.timestamp > otherTimestamp;
+		}
+		else if (type == PacketType::INPUT_ACK)
+		{
+			return inputAck.timestamp > otherTimestamp;
+		}
+	}
 };
 
 

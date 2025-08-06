@@ -26,4 +26,5 @@ private:
 	bool connected;
 	uint32_t inputSequence;
 	std::queue<InputPacket> unacknowledgedInputs; // Queue for unacknowledged inputs
+	uint32_t lastStateTimestamp;
 };
