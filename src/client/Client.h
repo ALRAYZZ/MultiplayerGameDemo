@@ -2,6 +2,7 @@
 #include "Network.h"
 #include "GameProtocol.h"
 #include "Renderer.h"
+#include <queue>
 
 class Client
 {
@@ -12,8 +13,10 @@ public:
 	void run();
 
 private:
+	void tick();
 	void handleInput();
 	void handlePacket(const Packet& packet);
+	void resendUnacknowledgedInputs();
 
 	Network network;
 	Renderer renderer;
@@ -21,4 +24,6 @@ private:
 	sockaddr_in serverAddr;
 	uint32_t playerId;
 	bool connected;
+	uint32_t inputSequence;
+	std::queue<InputPacket> unacknowledgedInputs; // Queue for unacknowledged inputs
 };

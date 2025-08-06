@@ -28,6 +28,8 @@ bool GameState::addPlayer(const sockaddr_in& clientAddr, uint32_t& playerId)
 	newPlayer.health = 100;
 	players.push_back(newPlayer); // Add the player to the players vector
 	clients[clientKey] = clientAddr; // Store the client address in the map that stores clients and their addresses
+	inputBuffers[newPlayer.id] = std::queue<PlayerInput>(); // Initialize input buffer for the player
+	lastProcessedSequences[newPlayer.id] = 0; // Initialize last processed sequence for the player
 
 	
 	// Update the state with the new player
@@ -40,19 +42,41 @@ bool GameState::addPlayer(const sockaddr_in& clientAddr, uint32_t& playerId)
 	return true;
 }
 
-void GameState::processInput(const InputPacket& input)
+void GameState::queueInput(const InputPacket& input)
+{
+	// If the input sequence is bigger than the last processed, send it to the input buffer
+	if (input.sequence > lastProcessedSequences[input.playerId])
+	{
+		PlayerInput playerInput;
+		playerInput.input = input;
+		playerInput.sequence = input.sequence;
+		inputBuffers[input.playerId].push(playerInput);
+	}
+}
+
+void GameState::processInput()
 {
 	for (auto& player : players)
 	{
-		// Search the player that sent the input and update its position based on the input
-		if (player.id == input.playerId)
+		auto& buffer = inputBuffers[player.id];
+		while (!buffer.empty())
 		{
-			float speed = 0.1f; // Movement speed in grid units (1.0f = 1 grid unit)
-			if (input.moveUp) player.y -= speed;
-			if (input.moveDown) player.y += speed;
-			if (input.moveLeft) player.x -= speed;
-			if (input.moveRight) player.x += speed;
-			break;
+			const PlayerInput& playerInput = buffer.front();
+			if (playerInput.sequence <= lastProcessedSequences[player.id])
+			{
+				buffer.pop(); // Discard outdate inputs
+				continue;
+			}
+
+			const InputPacket& input = playerInput.input;
+			float moveSpeed = 0.1f; // Define a movement speed
+			if (input.moveUp) player.y += moveSpeed;
+			if (input.moveDown) player.y -= moveSpeed;
+			if (input.moveLeft) player.x -= moveSpeed;
+			if (input.moveRight) player.x += moveSpeed;
+
+			lastProcessedSequences[player.id] = playerInput.sequence; // Update last processed sequence
+			buffer.pop(); // Remove the processed input
 		}
 	}
 
@@ -95,4 +119,9 @@ const std::map<std::string, sockaddr_in>& GameState::getClients() const
 	return clients;
 }
 
+uint32_t GameState::getLastProcessedSequence(uint32_t playerId) const
+{
+	auto it = lastProcessedSequences.find(playerId);
+	return it != lastProcessedSequences.end() ? it->second : 0;
+}
 

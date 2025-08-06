@@ -2,7 +2,7 @@
 #include <conio.h>
 #include <iostream>
 
-Client::Client(const std::string& serverIp, uint16_t serverPort) : playerId(0), connected(false)
+Client::Client(const std::string& serverIp, uint16_t serverPort) : playerId(0), connected(false), socket(INVALID_SOCKET), inputSequence(0)
 {
 	serverAddr.sin_family = AF_INET;
 	serverAddr.sin_port = htons(serverPort);
@@ -52,9 +52,9 @@ void Client::handleInput()
 	input.moveDown = false;
 	input.moveLeft = false;
 	input.moveRight = false;
-	input.timestamp = static_cast<uint32_t>(time(nullptr));
 
-	if (_kbhit())
+	// Doing a while instead of if: While captures all key presses until the buffer is empty
+	while (_kbhit())
 	{
 		char ch = _getch();
 		if (ch == 'w') input.moveUp = true;
@@ -65,13 +65,37 @@ void Client::handleInput()
 
 	if (input.moveUp || input.moveDown || input.moveLeft || input.moveRight)
 	{
-		// If input is made, send it to the server
+		input.timestamp = static_cast<uint32_t>(time(nullptr));
+		input.sequence = inputSequence++;
+		unacknowledgedInputs.push(input);
 		Packet inputPacket;
 		inputPacket.type = PacketType::INPUT;
 		inputPacket.input = input;
 		char buffer[MAX_PACKET_SIZE];
 		inputPacket.serialize(buffer);
 		network.sendPacket(socket, serverAddr, buffer, MAX_PACKET_SIZE);
+	}
+}
+
+// Resending Input packets that have not been acknowledged by the server
+void Client::resendUnacknowledgedInputs()
+{
+	auto tempQueue = unacknowledgedInputs; // Copy the queue to avoid modifying while iterating
+	unacknowledgedInputs = std::queue<InputPacket>();
+	while (!tempQueue.empty())
+	{
+		InputPacket input = tempQueue.front();
+		tempQueue.pop();
+		if (static_cast<uint32_t>(time(nullptr)) - input.timestamp < 5)
+		{
+			unacknowledgedInputs.push(input);
+			Packet inputPacket;
+			inputPacket.type = PacketType::INPUT;
+			inputPacket.input = input;
+			char buffer[MAX_PACKET_SIZE];
+			inputPacket.serialize(buffer);
+			network.sendPacket(socket, serverAddr, buffer, MAX_PACKET_SIZE);
+		}
 	}
 }
 
@@ -87,26 +111,55 @@ void Client::handlePacket(const Packet& packet)
 	{
 		renderer.render(packet.state);
 	}
+	else if (packet.type == PacketType::INPUT_ACK && connected)
+	{
+		// Remove acknowledged inputs from the queue
+		auto tempQueue = unacknowledgedInputs;
+		unacknowledgedInputs = std::queue<InputPacket>();
+		while (!tempQueue.empty())
+		{
+			InputPacket input = tempQueue.front();
+			tempQueue.pop();
+			if (input.sequence > packet.inputAck.sequence)
+			{
+				unacknowledgedInputs.push(input);
+			}
+		}
+	}
+}
+
+void Client::tick()
+{
+	handleInput();
+	resendUnacknowledgedInputs();
+
+	char buffer[MAX_PACKET_SIZE];
+	sockaddr_in fromAddr;
+	int fromAddrSize = sizeof(fromAddr);
+
+	while (network.receivePacket(socket, buffer, MAX_PACKET_SIZE, fromAddr, fromAddrSize))
+	{
+		Packet packet;
+		packet.deserialize(buffer);
+		handlePacket(packet);
+	}
 }
 
 void Client::run()
 {
+	const int TICK_RATE = 20;
+	const int TICK_TIME_MS = 1000 / TICK_RATE;
+
 	while (true)
 	{
-		handleInput();
+		auto start = GetTickCount64();
+		tick();
 
-		char buffer[MAX_PACKET_SIZE];
-		sockaddr_in fromAddr;
-		int fromAddrSize = sizeof(fromAddr);
-
-		while (network.receivePacket(socket, buffer, MAX_PACKET_SIZE, fromAddr, fromAddrSize))
+		auto elapsed = GetTickCount64() - start;
+		if (elapsed < TICK_TIME_MS)
 		{
-			Packet packet;
-			packet.deserialize(buffer);
-			handlePacket(packet);
+			Sleep(TICK_TIME_MS - elapsed);
 		}
-
-		Sleep(50);
 	}
 }
 

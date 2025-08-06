@@ -13,6 +13,7 @@ enum class PacketType : uint8_t
 	STATE = 2, // Server sends game state
 	CONNECT = 3, // Clients requests to connect
 	CONNECT_ACK = 4, // Server acknowledges connection with player ID
+	INPUT_ACK = 5, // Server acknowledges input
 };
 
 struct Player
@@ -20,6 +21,34 @@ struct Player
 	uint32_t id;
 	float x, y; // Player position
 	int32_t health;
+};
+
+// This allows us to call packet.deserialize(buffer) and it will automatically call the correct deserialize function based on the packet type
+struct Packet
+{
+	// Union allows us to save memory by using the same space for different types of data
+	// Packet struct will only be one type at a time either message, input, state or connect...
+	PacketType type;
+	union 
+	{
+		char message[256];
+		InputPacket input;
+		InputAckPacket inputAck;
+		StatePacket state;
+		uint32_t playerId;
+	};
+
+	void serialize(char* buffer) const;
+	void deserialize(const char* buffer);
+};
+
+struct InputAckPacket
+{
+	uint32_t playerId;
+	uint32_t sequence; // Tracking the sequence number of the input being acknowledged
+
+	void serialize(char* buffer) const;
+	void deserialize(const char* buffer);
 };
 
 // Input structure
@@ -31,6 +60,7 @@ struct InputPacket
 	bool moveLeft;
 	bool moveRight;
 	uint32_t timestamp; // For ordering inputs
+    uint32_t sequence; // Sequence number for input ordering
 
 	void serialize(char* buffer) const;
 	void deserialize(const char* buffer);
@@ -47,121 +77,4 @@ struct StatePacket
 	void deserialize(const char* buffer);
 };
 
-// This allows us to call packet.deserialize(buffer) and it will automatically call the correct deserialize function based on the packet type
-struct Packet
-{
-	// Union allows us to save memory by using the same space for different types of data
-	// Packet struct will only be one type at a time either message, input, state or connect...
-	PacketType type;
-	union 
-	{
-		char message[256];
-		InputPacket input;
-		StatePacket state;
-		uint32_t playerId;
-	};
 
-	void serialize(char* buffer) const;
-	void deserialize(const char* buffer);
-};
-
-// Inline implementations for serialization and deserialization (move these to a .cpp file ??)
-inline void InputPacket::serialize(char* buffer) const 
-{
-    size_t offset = 0;
-    memcpy(buffer + offset, &playerId, sizeof(playerId));
-    offset += sizeof(playerId);
-    memcpy(buffer + offset, &moveUp, sizeof(moveUp));
-    offset += sizeof(moveUp);
-    memcpy(buffer + offset, &moveDown, sizeof(moveDown));
-    offset += sizeof(moveDown);
-    memcpy(buffer + offset, &moveLeft, sizeof(moveLeft));
-    offset += sizeof(moveLeft);
-    memcpy(buffer + offset, &moveRight, sizeof(moveRight));
-    offset += sizeof(moveRight);
-    memcpy(buffer + offset, &timestamp, sizeof(timestamp));
-}
-
-inline void InputPacket::deserialize(const char* buffer) 
-{
-    size_t offset = 0;
-    memcpy(&playerId, buffer + offset, sizeof(playerId));
-    offset += sizeof(playerId);
-    memcpy(&moveUp, buffer + offset, sizeof(moveUp));
-    offset += sizeof(moveUp);
-    memcpy(&moveDown, buffer + offset, sizeof(moveDown));
-    offset += sizeof(moveDown);
-    memcpy(&moveLeft, buffer + offset, sizeof(moveLeft));
-    offset += sizeof(moveLeft);
-    memcpy(&moveRight, buffer + offset, sizeof(moveRight));
-    offset += sizeof(moveRight);
-    memcpy(&timestamp, buffer + offset, sizeof(timestamp));
-}
-
-inline void StatePacket::serialize(char* buffer) const 
-{
-    size_t offset = 0;
-    memcpy(buffer + offset, &playerCount, sizeof(playerCount));
-    offset += sizeof(playerCount);
-    memcpy(buffer + offset, players, sizeof(players));
-    offset += sizeof(players);
-    memcpy(buffer + offset, &timestamp, sizeof(timestamp));
-}
-
-inline void StatePacket::deserialize(const char* buffer) 
-{
-    size_t offset = 0;
-    memcpy(&playerCount, buffer + offset, sizeof(playerCount));
-    offset += sizeof(playerCount);
-    memcpy(players, buffer + offset, sizeof(players));
-    offset += sizeof(players);
-    memcpy(&timestamp, buffer + offset, sizeof(timestamp));
-}
-
-inline void Packet::serialize(char* buffer) const 
-{
-    size_t offset = 0;
-    memcpy(buffer + offset, &type, sizeof(type));
-    offset += sizeof(type);
-
-    if (type == PacketType::MESSAGE) 
-    {
-        memcpy(buffer + offset, message, sizeof(message));
-    }
-    else if (type == PacketType::INPUT) 
-    {
-        input.serialize(buffer + offset);
-    }
-    else if (type == PacketType::STATE) 
-    {
-        state.serialize(buffer + offset);
-    }
-    else if (type == PacketType::CONNECT || type == PacketType::CONNECT_ACK) 
-    {
-        memcpy(buffer + offset, &playerId, sizeof(playerId));
-    }
-}
-
-inline void Packet::deserialize(const char* buffer) 
-{
-    size_t offset = 0;
-    memcpy(&type, buffer + offset, sizeof(type));
-    offset += sizeof(type);
-
-    if (type == PacketType::MESSAGE) 
-    {
-        memcpy(message, buffer + offset, sizeof(message));
-    }
-    else if (type == PacketType::INPUT) 
-    {
-        input.deserialize(buffer + offset);
-    }
-    else if (type == PacketType::STATE) 
-    {
-        state.deserialize(buffer + offset);
-    }
-    else if (type == PacketType::CONNECT || type == PacketType::CONNECT_ACK) 
-    {
-        memcpy(&playerId, buffer + offset, sizeof(playerId));
-    }
-}

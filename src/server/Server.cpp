@@ -2,7 +2,7 @@
 #include <iostream>
 
 // Constructor initializes the server with a specified port and sets the socket to an invalid state.
-Server::Server(uint16_t port) : port(port), socket(INVALID_SOCKET) {}
+Server::Server(uint16_t port) : port(port), socket(INVALID_SOCKET), tickCount(0) {}
 
 Server::~Server()
 {
@@ -36,6 +36,7 @@ bool Server::initialize()
 	return true;
 }
 
+// Handles incoming packets based on their type.
 void Server::handlePacket(const Packet& packet, const sockaddr_in& clientAddr)
 {
 	if (packet.type == PacketType::CONNECT)
@@ -54,8 +55,53 @@ void Server::handlePacket(const Packet& packet, const sockaddr_in& clientAddr)
 	}
 	else if (packet.type == PacketType::INPUT)
 	{
-		gameState.processInput(packet.input);
+		gameState.queueInput(packet.input);
+		// Acknowledge the input received
+		Packet ack;
+		ack.type = PacketType::INPUT_ACK;
+		ack.inputAck.playerId = packet.input.playerId;
+		ack.inputAck.sequence = packet.input.sequence;
+		char buffer[MAX_PACKET_SIZE];
+		ack.serialize(buffer);
+		network.sendPacket(socket, clientAddr, buffer, MAX_PACKET_SIZE);
 	}
+}
+
+// Processes incoming packets, updates the game state, and broadcasts the current state to all clients.
+void Server::tick()
+{
+	char buffer[MAX_PACKET_SIZE];
+	sockaddr_in clientAddr;
+	int clientAddrSize = sizeof(clientAddr);
+
+	// Receive packets from clients and send them for handling
+	while (network.receivePacket(socket, buffer, MAX_PACKET_SIZE, clientAddr, clientAddrSize))
+	{
+		Packet packet;
+		packet.deserialize(buffer);
+		handlePacket(packet, clientAddr);
+	}
+
+	// Process buffered inputs
+	gameState.processInput();
+
+	// Update game state
+	gameState.update();
+
+	// Broadcast state
+	const StatePacket& state = gameState.getState();
+	Packet statePacket;
+	statePacket.type = PacketType::STATE;
+	statePacket.state = state;
+	char sendBuffer[MAX_PACKET_SIZE];
+	statePacket.serialize(sendBuffer);
+
+	for (const auto& [key, addr] : gameState.getClients())
+	{
+		network.sendPacket(socket, addr, sendBuffer, MAX_PACKET_SIZE);
+	}
+
+	tickCount++;
 }
 
 void Server::run()
@@ -66,34 +112,9 @@ void Server::run()
 	while (true)
 	{
 		auto start = GetTickCount64();
+		// Run the server tick
+		tick();
 
-		// Receive packets from clients
-		char buffer[MAX_PACKET_SIZE];
-		sockaddr_in clientAddr;
-		int clientAddrSize = sizeof(clientAddr);
-
-		while (network.receivePacket(socket, buffer, MAX_PACKET_SIZE, clientAddr, clientAddrSize))
-		{
-			Packet packet;
-			packet.deserialize(buffer);
-			handlePacket(packet, clientAddr);
-		}
-
-		// Update game state
-		gameState.update();
-
-		// Broadcast state
-		const StatePacket& state = gameState.getState();
-		Packet statePacket;
-		statePacket.type = PacketType::STATE;
-		statePacket.state = state;
-		char sendBuffer[MAX_PACKET_SIZE];
-		statePacket.serialize(sendBuffer);
-
-		for (const auto& [_, addr] : gameState.getClients())
-		{
-			network.sendPacket(socket, addr, sendBuffer, MAX_PACKET_SIZE);
-		}
 
 		// Maintain tick rate
 		auto elapsed = GetTickCount64() - start;

@@ -2,8 +2,6 @@
 #include "Network.h"
 #include "GameState.h"
 
-
-
 class Server
 {
 public:
@@ -14,9 +12,11 @@ public:
 
 private:
 	void handlePacket(const Packet& packet, const sockaddr_in& clientAddr);
+	void tick();
 
 	Network network;
 	GameState gameState;
 	SOCKET socket;
 	uint16_t port;
+	uint32_t tickCount;
 };
