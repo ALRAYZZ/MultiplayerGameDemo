@@ -114,7 +114,12 @@ void Client::handlePacket(const Packet& packet)
 	else if (packet.type == PacketType::STATE && connected && packet.isNewerThan(lastStateTimestamp))
 	{
 		lastStateTimestamp = packet.state.timestamp;
-		renderer.render(packet.state);
+		stateBuffer.push_back(packet.state);
+		// Keep only the last 2 states for interpolation
+		if (stateBuffer.size() > 2)
+		{
+			stateBuffer.erase(stateBuffer.begin());
+		}
 		std::cout << "Applied state with timestamp " << packet.state.timestamp << std::endl;
 	}
 	else if (packet.type == PacketType::INPUT_ACK && connected)
@@ -149,6 +154,11 @@ void Client::tick()
 		Packet packet;
 		packet.deserialize(buffer);
 		handlePacket(packet);
+	}
+
+	if (!stateBuffer.empty())
+	{
+		renderer.render(stateBuffer);
 	}
 }
 

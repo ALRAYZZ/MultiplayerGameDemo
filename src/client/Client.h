@@ -3,6 +3,7 @@
 #include "GameProtocol.h"
 #include "Renderer.h"
 #include <queue>
+#include <vector>
 
 class Client
 {
@@ -27,4 +28,5 @@ private:
 	uint32_t inputSequence;
 	std::queue<InputPacket> unacknowledgedInputs; // Queue for unacknowledged inputs
 	uint32_t lastStateTimestamp;
+	std::vector<StatePacket> stateBuffer; // Buffer for interpolation
 };
